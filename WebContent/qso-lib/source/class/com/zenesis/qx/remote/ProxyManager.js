@@ -832,9 +832,7 @@ qx.Class.define("com.zenesis.qx.remote.ProxyManager", {
           // An on demand server property value changed, clear the cache
         } else if (type == "expire") {
           var obj = this.readProxyObject(elem.object, stats);
-          var upname = qx.lang.String.firstUp(elem.name);
-          obj.expirePropertyOnDemand(upname, false);
-
+          obj.reset(elem.name);
           // A server property value changed, update the client
         } else if (type == "edit-array") {
           (function () {
@@ -1394,19 +1392,6 @@ qx.Class.define("com.zenesis.qx.remote.ProxyManager", {
               def.members["_transform" + upname] = new Function("value", "oldValue", 'this._transformProperty("' + propName + '", value, oldValue);');
             }
 
-            // onDemand properties - patch it later
-            if (fromDef.onDemand) {
-              def.members["get" + upname] = new Function("async", "return this._getPropertyOnDemand('" + propName + "', async);");
-              def.members["expire" + upname] = new Function("sendToServer", "return this.expirePropertyOnDemand('" + propName + "', sendToServer);");
-              def.members["set" + upname] = new Function("value", "async", "return this._setPropertyOnDemand('" + propName + "', value, async);");
-              def.members["get" + upname + "Async"] = new Function("async", "return this._getPropertyOnDemandAsync('" + propName + "');");
-              def.members["get" + upname + "Async"] = new Function(
-                "return new qx.Promise(function(resolve) {" + "  this._getPropertyOnDemand('" + propName + "', function(result) {" + "    resolve(result);" + "  });" + "}, this);"
-              );
-            } else {
-              def.members["get" + upname + "Async"] = new Function("return qx.Promise.resolve(this.get" + upname + "()).bind(this);");
-            }
-
             // Meta data
             strDeferCode +=
               "qx.lang.Object.mergeWith(clazz.$$properties." +
@@ -1891,8 +1876,9 @@ qx.Class.define("com.zenesis.qx.remote.ProxyManager", {
         return;
       }
       let pd = qx.Class.getPropertyDefinition(serverObject.constructor, propertyName);
+      let prop = qx.Class.getByProperty(serverObject.constructor, propertyName);
 
-      if (!this.isSettingProperty(serverObject, propertyName)) {
+      if (!this.isSettingProperty(serverObject, propertyName) && !(prop.supportsGetAsync() && prop.isInitializing(serverObject))) {
         let annoDate = null;
         if (value) {
           if (pd.check === "Date") {
