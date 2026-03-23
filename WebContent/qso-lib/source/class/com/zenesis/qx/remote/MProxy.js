@@ -256,10 +256,15 @@ qx.Mixin.define("com.zenesis.qx.remote.MProxy", {
         return;
       }
       PM.clearException();
-      if (!prop.hasLocalValue(this) && prop.supportsGetAsync()) {
-        PM.expireProperty(this, propertyName);
-      } else {
-        PM.setPropertyValue(this, propertyName, value, oldValue);
+
+      //We only send the changes to the server if we're not in the middle of a server response,
+      //and we are not fetching a property asynchronously
+      if (!PM.isInResponse() && !(prop.supportsGetAsync() && prop.isInitializing(this))) {
+        if (!prop.hasLocalValue(this) && prop.supportsGetAsync()) {
+          PM.expireProperty(this, propertyName);
+        } else {
+          PM.setPropertyValue(this, propertyName, value, oldValue);
+        }
       }
       var ex = PM.clearException();
       if (ex) {
